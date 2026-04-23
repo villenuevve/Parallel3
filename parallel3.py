@@ -1,4 +1,5 @@
 import threading
+import subprocess
 import multiprocessing
 import matplotlib.pyplot as plt
 import random
@@ -220,6 +221,45 @@ def run_shared():
     print("Value:", val.value)
     return t, val.value
 
+#с++
+def run_cpp_process():
+    print("\nC++ PROCESS (Cross-language IPC)")
+
+    proc = subprocess.Popen(
+        ["./worker"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1
+    )
+
+    start = time.perf_counter()
+
+    for _ in range(10):
+        num = random.randint(1, 100)
+
+        proc.stdin.write(f"{num}\n")
+        proc.stdin.flush()
+
+        result = proc.stdout.readline().strip()
+
+        if not result:
+            continue
+
+        print(f"Sent: {num}, Received: {result}")
+
+        time.sleep(0.01)
+
+    proc.stdin.write("exit\n")
+    proc.stdin.flush()
+
+    proc.wait()
+
+    t = time.perf_counter() - start
+    print("C++ Time:", round(t, 4))
+    return t
+
 #BENCHMARK THREAD SCALING
 def benchmark_threads():
     labels = []
@@ -256,6 +296,7 @@ if __name__ == "__main__":
     q = run_queue()
     p = run_pipe()
     sh, val = run_shared()
+    cpp_time = run_cpp_process()
 
     labels, thread_times = benchmark_threads()
     
@@ -282,7 +323,7 @@ if __name__ == "__main__":
 
     #3
     plt.figure()
-    plt.bar(["Queue", "Pipe", "Shared"], [q, p, sh])
+    plt.bar(["Queue", "Pipe", "Shared", "C++ IPC"], [q, p, sh, cpp_time])
     plt.title("Message Passing")
     plt.savefig("plots/03_messaging.png")
     plt.show()
