@@ -3,6 +3,7 @@ import multiprocessing
 import matplotlib.pyplot as plt
 import random
 import time
+import os
 
 N_ACCOUNTS = 120
 INIT_BALANCE = 100
@@ -244,7 +245,7 @@ def benchmark_threads():
 
 #main 
 if __name__ == "__main__":
-
+    os.makedirs("plots", exist_ok=True)
     print("INITIAL:", N_ACCOUNTS * INIT_BALANCE)
 
     seq = run_sequential()
@@ -269,18 +270,21 @@ if __name__ == "__main__":
     plt.bar(["Seq", "Race", "Safe", "Deadlock"], [seq, race, safe, dead])
     plt.yscale("log")
     plt.title("Execution Comparison")
+    plt.savefig("plots/01_execution.png")
     plt.show()
 
     #2
     plt.figure()
     plt.bar(["Race", "Safe"], [race, safe])
     plt.title("Race vs Safe")
+    plt.savefig("plots/02_race_safe.png")
     plt.show()
 
     #3
     plt.figure()
     plt.bar(["Queue", "Pipe", "Shared"], [q, p, sh])
     plt.title("Message Passing")
+    plt.savefig("plots/03_messaging.png")
     plt.show()
 
     #4
@@ -288,6 +292,7 @@ if __name__ == "__main__":
     plt.title("Thread Scaling")
     plt.xlabel("Threads")
     plt.ylabel("Time")
+    plt.savefig("plots/04_scaling.png")
     plt.show()
 
     #5
@@ -295,4 +300,5 @@ if __name__ == "__main__":
     plt.bar(["Seq", "Parallel Safe"], [seq, safe])
     plt.yscale("log")
     plt.title("Overhead Comparison")
+    plt.savefig("plots/05_overhead.png")
     plt.show()
