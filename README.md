@@ -57,7 +57,7 @@
 
 ## Постановка задач
 
-### Задача 1: Race Condition та Deadlock
+## Задача 1: Race Condition та Deadlock
 
 Модель банківської системи:
 
@@ -75,7 +75,7 @@
 
 ---
 
-### Задача 2: Message Passing
+## Задача 2: Message Passing
 
 Реалізовано передачу даних між процесами:
 
