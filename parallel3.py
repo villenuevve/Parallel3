@@ -6,8 +6,11 @@ import random
 import time
 import os
 
+#CONFIG
 N_ACCOUNTS = 120
 INIT_BALANCE = 100
+
+# INIT STATE
 def init():
     global accounts, locks
     accounts = {i: INIT_BALANCE for i in range(N_ACCOUNTS)}
@@ -16,7 +19,7 @@ def init():
 def total():
     return sum(accounts.values())
 
-#SEQUENTIAL
+# SEQUENTIAL
 def transfer_seq(a, b, amount):
     if accounts[a] >= amount:
         accounts[a] -= amount
@@ -35,10 +38,9 @@ def run_sequential():
     print("\nSEQUENTIAL")
     print("Time:", round(t, 4))
     print("Total:", total())
+    return t
 
-    return t  
-
-#RACE CONDITION (BROKEN)
+# RACE CONDITION
 def transfer_race(a, b, amount):
     tmp = accounts[a]
     time.sleep(0.000001)
@@ -64,11 +66,13 @@ def run_race():
         t.join()
 
     t = time.perf_counter() - start
+
     print("\nRACE CONDITION (BROKEN)")
     print("Time:", round(t, 4))
     print("Total:", total())
     return t
 
+# SAFE VERSION
 def transfer_safe(a, b, amount):
     x, y = sorted([a, b])
     with locks[x]:
@@ -96,34 +100,37 @@ def run_safe():
         t.join()
 
     t = time.perf_counter() - start
+
     print("\nSAFE VERSION")
     print("Time:", round(t, 4))
     print("Total:", total())
     return t
 
-#DEADLOCK SIMULATION
+# DEADLOCK SIMULATION
 log = []
 
 def transfer_deadlock_sim(a, b):
     if not locks[a].acquire(timeout=0.01):
-        log.append("fail A")
         return
 
-    time.sleep(0.001)
+    try:
+        time.sleep(0.001)
 
-    if not locks[b].acquire(timeout=0.01):
+        if not locks[b].acquire(timeout=0.01):
+            return
+
+        try:
+            pass
+        finally:
+            locks[b].release()
+    finally:
         locks[a].release()
-        log.append(f"deadlock avoided {a}-{b}")
-        return
-
-    log.append(f"ok {a}->{b}")
-    locks[b].release()
-    locks[a].release()
 
 def worker_deadlock():
     for _ in range(1000):
         a, b = random.sample(range(N_ACCOUNTS), 2)
         transfer_deadlock_sim(a, b)
+
 
 def run_deadlock():
     init()
@@ -139,12 +146,13 @@ def run_deadlock():
         t.join()
 
     t = time.perf_counter() - start
+
     print("\nDEADLOCK SIMULATION")
     print("Time:", round(t, 4))
     print("Total:", total())
     return t
 
-#MESSAGE PASSING
+# MESSAGE PASSING
 def worker_queue(q):
     while True:
         x = q.get()
@@ -163,10 +171,12 @@ def run_queue():
         q.put(i + 1)
 
     time.sleep(1)
+
     q.put(None)
     p.join()
 
     t = time.perf_counter() - start
+
     print("\nQUEUE:", round(t, 4))
     return t
 
@@ -192,6 +202,7 @@ def run_pipe():
     p.join()
 
     t = time.perf_counter() - start
+
     print("\nPIPE:", round(t, 4))
     return t
 
@@ -217,11 +228,12 @@ def run_shared():
     p.join()
 
     t = time.perf_counter() - start
+
     print("\nSHARED:", round(t, 4))
     print("Value:", val.value)
     return t, val.value
 
-#с++
+#C++ IPC
 def run_cpp_process():
     print("\nC++ PROCESS (Cross-language IPC)")
 
@@ -244,10 +256,8 @@ def run_cpp_process():
 
         result = proc.stdout.readline().strip()
 
-        if not result:
-            continue
-
-        print(f"Sent: {num}, Received: {result}")
+        if result:
+            print(f"Sent: {num}, Received: {result}")
 
         time.sleep(0.01)
 
@@ -257,10 +267,11 @@ def run_cpp_process():
     proc.wait()
 
     t = time.perf_counter() - start
+
     print("C++ Time:", round(t, 4))
     return t
 
-#BENCHMARK THREAD SCALING
+# THREAD SCALING
 def benchmark_threads():
     labels = []
     times = []
@@ -283,13 +294,35 @@ def benchmark_threads():
 
     return labels, times
 
-#main 
+#PROCESS SCALING
+def cpu_heavy_task(x):
+    res = 0
+    for i in range(x):
+        res += i
+    return res
+
+def benchmark_processes():
+    labels = [1, 2, 4, 8]
+    times = []
+
+    for workers in labels:
+        start = time.perf_counter()
+
+        with multiprocessing.Pool(processes=workers) as pool:
+            pool.map(cpu_heavy_task, [1000000] * 8)
+
+        times.append(time.perf_counter() - start)
+
+    return labels, times
+
+# MAIN
 if __name__ == "__main__":
     os.makedirs("plots", exist_ok=True)
+
     print("INITIAL:", N_ACCOUNTS * INIT_BALANCE)
 
     seq = run_sequential()
-    race = run_race() 
+    race = run_race()
     safe = run_safe()
     dead = run_deadlock()
 
@@ -299,14 +332,15 @@ if __name__ == "__main__":
     cpp_time = run_cpp_process()
 
     labels, thread_times = benchmark_threads()
-    
-    print("DEBUG VALUES:")
+    proc_labels, proc_times = benchmark_processes()
+
+    print("\nDEBUG VALUES:")
     print("seq =", seq)
     print("race =", race)
     print("safe =", safe)
     print("dead =", dead)
-    
-    #1`
+
+    # 1
     plt.figure()
     plt.bar(["Seq", "Race", "Safe", "Deadlock"], [seq, race, safe, dead])
     plt.yscale("log")
@@ -314,21 +348,22 @@ if __name__ == "__main__":
     plt.savefig("plots/01_execution.png")
     plt.show()
 
-    #2
+    # 2
     plt.figure()
     plt.bar(["Race", "Safe"], [race, safe])
     plt.title("Race vs Safe")
     plt.savefig("plots/02_race_safe.png")
     plt.show()
 
-    #3
+    # 3
     plt.figure()
     plt.bar(["Queue", "Pipe", "Shared", "C++ IPC"], [q, p, sh, cpp_time])
     plt.title("Message Passing")
     plt.savefig("plots/03_messaging.png")
     plt.show()
 
-    #4
+    # 4
+    plt.figure()
     plt.plot(labels, thread_times, marker='o')
     plt.title("Thread Scaling")
     plt.xlabel("Threads")
@@ -336,10 +371,19 @@ if __name__ == "__main__":
     plt.savefig("plots/04_scaling.png")
     plt.show()
 
-    #5
+    # 5
     plt.figure()
     plt.bar(["Seq", "Parallel Safe"], [seq, safe])
     plt.yscale("log")
     plt.title("Overhead Comparison")
     plt.savefig("plots/05_overhead.png")
+    plt.show()
+
+    # 6
+    plt.figure()
+    plt.plot(proc_labels, proc_times, marker='o')
+    plt.title("Process Scaling")
+    plt.xlabel("Processes")
+    plt.ylabel("Time")
+    plt.savefig("plots/06_process_scaling.png")
     plt.show()
